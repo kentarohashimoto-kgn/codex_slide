@@ -89,9 +89,8 @@ export function DeckBuilder() {
       const localDecks = loadLocalDecks(currentUser);
 
       try {
-        const response = await fetch("/api/decks", { cache: "no-store" });
-        const data = response.ok ? ((await response.json()) as { decks?: Deck[] }) : { decks: [] };
-        if (!cancelled) setSavedDecks(mergeDecks([...(data.decks ?? []), ...localDecks]));
+        const [serverDecks, bundledDecks] = await Promise.all([fetchServerDecks(), fetchBundledDecks(currentUser)]);
+        if (!cancelled) setSavedDecks(mergeDecks([...bundledDecks, ...serverDecks, ...localDecks]));
       } catch {
         if (!cancelled) setSavedDecks(localDecks);
       } finally {
@@ -635,6 +634,30 @@ async function readErrorMessage(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+async function fetchServerDecks() {
+  const response = await fetch("/api/decks", { cache: "no-store" });
+  const data = response.ok ? ((await response.json()) as { decks?: Deck[] }) : { decks: [] };
+  return data.decks ?? [];
+}
+
+async function fetchBundledDecks(user: string) {
+  const bundledPaths = ["/generated-decks/kojima-material-poc/deck.json"];
+  const decks: Array<Deck | null> = await Promise.all(
+    bundledPaths.map(async (path) => {
+      try {
+        const response = await fetch(path, { cache: "no-store" });
+        if (!response.ok) return null;
+        const deck = (await response.json()) as Deck;
+        return { ...deck, userId: user };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return decks.filter((deck): deck is Deck => deck !== null);
 }
 
 function storageKey(user: string) {
