@@ -66,6 +66,7 @@ export async function generateDeck(input: DeckGenerationRequest): Promise<Deck> 
       language: input.language,
       mode: input.mode,
       templateId: input.templateId,
+      settings: input,
       status: "completed",
       slideCount: slides.length,
       slides,
@@ -105,8 +106,24 @@ Requirements:
 - Audience: ${input.audience}
 - Slide count: ${input.slideCount}
 - Mode: ${input.mode}
+- Template source: ${input.templateSource}
+- Template ID: ${input.templateId}
+- Deck type: ${input.deckType}
+- Chapter: ${input.deckType === "chapter" ? `${input.chapterIndex} of ${input.chapterTotal}` : "single deck"}
+- Aspect ratio: ${input.aspectRatio}
+- Typography preset: ${input.typographyPreset}
+- Text visibility: ${input.textVisibility}
+- Brand color: ${input.brandColor || "none"}
+- Page numbers: ${input.showPageNumber ? "yes" : "no"}
+- Split pagination: ${input.splitPagination ? `yes, total ${input.totalPages}, starts at ${input.pageNumberOffset}` : "no"}
+- Repeat title in footer: ${input.showFooterTitle ? "yes" : "no"}
+- Cover message position: ${input.coverMessagePosition}
+- Closing layout: ${input.outroLayout}
+- Credits: ${[input.creditAuthor, input.creditOrganization, input.creditDate, input.creditContact].filter(Boolean).join(" / ") || "none"}
+- Final CTA: ${input.creditCta || "none"}
 - Tone instructions: ${input.tone}
 - Source material: ${input.material}
+- Additional visual/content instruction: ${input.extraNote || "none"}
 
 Return this JSON shape:
 {
@@ -199,4 +216,3 @@ function inferLayoutType(index: number, total: number): LayoutType {
   if (index % 5 === 0) return "comparison";
   return "benefit";
 }
-

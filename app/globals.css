@@ -43,7 +43,7 @@ button {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 390px minmax(0, 1fr);
+  grid-template-columns: 430px minmax(0, 1fr);
 }
 
 .control-panel {
@@ -101,6 +101,15 @@ button {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fffaf2;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .field-group label {
   display: grid;
   gap: 7px;
@@ -154,6 +163,14 @@ select:focus {
   border-radius: 10px;
 }
 
+.segmented.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.source-tabs {
+  grid-template-columns: 1fr 1fr;
+}
+
 .segmented button,
 .primary-button,
 .icon-button,
@@ -185,6 +202,172 @@ select:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.count-grid button {
+  min-height: 34px;
+  color: rgba(251, 248, 241, 0.76);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.count-grid button.active {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.template-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px;
+  color: rgba(251, 248, 241, 0.76);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.template-card.active {
+  color: #fffaf2;
+  border-color: rgba(98, 216, 192, 0.55);
+  background: rgba(98, 216, 192, 0.1);
+}
+
+.template-preview {
+  position: relative;
+  height: 76px;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.template-preview i,
+.template-preview b,
+.template-preview em {
+  position: absolute;
+  display: block;
+}
+
+.template-preview i {
+  right: -16px;
+  top: -8px;
+  width: 58px;
+  height: 92px;
+  transform: rotate(16deg);
+}
+
+.template-preview b {
+  left: 14px;
+  right: 28px;
+  top: 44px;
+  height: 6px;
+  border-radius: 99px;
+}
+
+.template-preview em {
+  left: 16px;
+  top: 17px;
+  width: 42px;
+  height: 30px;
+  border: 2px solid;
+  border-radius: 4px;
+}
+
+.template-card .swatches {
+  grid-row: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.template-card .swatches i {
+  width: 18px;
+  height: 8px;
+  border-radius: 99px;
+}
+
+.template-card strong {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.template-card small {
+  min-width: 0;
+  color: rgba(251, 248, 241, 0.58);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-row span {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  color: rgba(251, 248, 241, 0.72);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.toggle-list {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.checkbox-line {
+  min-height: 24px;
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 9px !important;
+  color: rgba(251, 248, 241, 0.74) !important;
+}
+
+.checkbox-line input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  accent-color: var(--accent);
+}
+
+.warning-text {
+  margin: 0;
+  color: #ffe1a6;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .template-list {
@@ -263,7 +446,9 @@ select:focus {
 .icon-button:hover:not(:disabled),
 .ghost-button:hover:not(:disabled),
 .slide-nav button:hover:not(:disabled),
-.template-option:hover {
+.template-option:hover,
+.template-card:hover,
+.count-grid button:hover {
   transform: translateY(-1px);
 }
 
@@ -538,8 +723,13 @@ button:disabled {
   }
 
   .compact-row,
-  .slide-meta {
+  .slide-meta,
+  .template-grid {
     grid-template-columns: 1fr;
+  }
+
+  .count-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .viewer-topbar {
@@ -555,4 +745,3 @@ button:disabled {
     font-size: 20px;
   }
 }
-

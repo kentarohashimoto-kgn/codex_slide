@@ -7,7 +7,14 @@ The MVP supports two generation modes:
 - Image mode: generates slide image prompts and, when enabled, uses GPT Image 2 for slide images.
 - HTML mode: generates browser-previewable HTML/CSS slides.
 
-Both modes can be exported as a 16:9 PPTX.
+Both modes can be exported as PPTX.
+
+The deck builder now includes richer slide creation controls:
+
+- Visual style presets split into system templates and company-only templates.
+- Slide count, chapter splitting, aspect ratio, typography, and text visibility settings.
+- Page numbering, cross-chapter pagination, footer title, cover alignment, closing layout, credits, CTA, and extra instructions.
+- Template settings are included in image prompts, HTML previews, and PPTX fallback rendering.
 
 ## Local Development
 

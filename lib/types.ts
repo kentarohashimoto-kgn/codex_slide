@@ -4,6 +4,20 @@ export type DeckStatus = "draft" | "generating" | "review" | "completed" | "fail
 
 export type SlideStatus = "pending" | "generating" | "completed" | "failed";
 
+export type TemplateSource = "system" | "company";
+
+export type DeckType = "single" | "chapter";
+
+export type AspectRatio = "16:9" | "4:3" | "1:1";
+
+export type TypographyPreset = "gothic" | "mincho" | "mono";
+
+export type TextVisibilityPreset = "standard" | "high" | "compact";
+
+export type CoverMessagePosition = "left" | "right";
+
+export type OutroLayout = "split" | "stacked";
+
 export type LayoutType =
   | "cover"
   | "agenda"
@@ -17,8 +31,10 @@ export type LayoutType =
 
 export type TemplateDefinition = {
   id: string;
+  source: TemplateSource;
   name: string;
   description: string;
+  moodKeywords: string[];
   modeSupport: DeckMode[];
   palette: {
     paper: string;
@@ -33,6 +49,11 @@ export type TemplateDefinition = {
     heading: string;
     body: string;
     mono: string;
+  };
+  previewStyle: {
+    background: string;
+    line: string;
+    block: string;
   };
   visualRules: string[];
   htmlTokens: Record<string, string>;
@@ -65,6 +86,7 @@ export type Deck = {
   language: string;
   mode: DeckMode;
   templateId: string;
+  settings?: DeckGenerationRequest;
   status: DeckStatus;
   slideCount: number;
   slides: Slide[];
@@ -81,6 +103,26 @@ export type DeckGenerationRequest = {
   slideCount: number;
   language: string;
   mode: DeckMode;
+  templateSource: TemplateSource;
   templateId: string;
+  deckType: DeckType;
+  chapterTotal: number;
+  chapterIndex: number;
+  aspectRatio: AspectRatio;
+  typographyPreset: TypographyPreset;
+  textVisibility: TextVisibilityPreset;
+  brandColor: string;
+  showPageNumber: boolean;
+  splitPagination: boolean;
+  totalPages: number;
+  pageNumberOffset: number;
+  showFooterTitle: boolean;
+  coverMessagePosition: CoverMessagePosition;
+  outroLayout: OutroLayout;
+  creditAuthor: string;
+  creditOrganization: string;
+  creditDate: string;
+  creditContact: string;
+  creditCta: string;
+  extraNote: string;
 };
-

@@ -25,6 +25,7 @@ export function DeckViewer({ deck, selectedIndex, onSelect, onRegenerate, regene
   const slide = deck.slides[selectedIndex] ?? deck.slides[0];
   const canPrev = selectedIndex > 0;
   const canNext = selectedIndex < deck.slides.length - 1;
+  const aspectRatio = deck.settings?.aspectRatio === "4:3" ? "4 / 3" : deck.settings?.aspectRatio === "1:1" ? "1 / 1" : "16 / 9";
 
   return (
     <div className="deck-layout">
@@ -62,7 +63,7 @@ export function DeckViewer({ deck, selectedIndex, onSelect, onRegenerate, regene
           </button>
         </div>
 
-        <section className="stage-shell" aria-label="スライドプレビュー">
+        <section className="stage-shell" style={{ aspectRatio }} aria-label="スライドプレビュー">
           {deck.mode === "image" ? <ImageSlide slide={slide} /> : <HtmlSlide slide={slide} />}
         </section>
 
@@ -120,4 +121,3 @@ function HtmlSlide({ slide }: { slide: Slide }) {
 
   return <iframe className="slide-frame" title={slide.title} sandbox="" srcDoc={srcDoc} />;
 }
-
