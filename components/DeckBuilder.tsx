@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Building2,
   Download,
   FileCode2,
+  FolderOpen,
   Hash,
   Image as ImageIcon,
   LayoutTemplate,
@@ -13,7 +14,8 @@ import {
   Palette,
   SlidersHorizontal,
   Sparkles,
-  Type
+  Type,
+  UserRound
 } from "lucide-react";
 import { getTemplatesBySource, templates } from "@/lib/templates";
 import type { Deck, DeckGenerationRequest, DeckMode, Slide, TemplateSource } from "@/lib/types";
@@ -61,6 +63,9 @@ export function DeckBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [regeneratingSlideId, setRegeneratingSlideId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState("default");
+  const [savedDecks, setSavedDecks] = useState<Deck[]>([]);
+  const [isLoadingDecks, setIsLoadingDecks] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const availableTemplates = useMemo(() => getTemplatesBySource(input.templateSource), [input.templateSource]);
@@ -70,6 +75,35 @@ export function DeckBuilder() {
   );
   const pageEnd = input.pageNumberOffset + input.slideCount - 1;
   const pageNumberWarning = input.splitPagination && input.showPageNumber && pageEnd > input.totalPages;
+
+  useEffect(() => {
+    const user = readCookie("codex_slide_user") || "default";
+    setCurrentUser(user);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDecks() {
+      setIsLoadingDecks(true);
+      const localDecks = loadLocalDecks(currentUser);
+
+      try {
+        const response = await fetch("/api/decks", { cache: "no-store" });
+        const data = response.ok ? ((await response.json()) as { decks?: Deck[] }) : { decks: [] };
+        if (!cancelled) setSavedDecks(mergeDecks([...(data.decks ?? []), ...localDecks]));
+      } catch {
+        if (!cancelled) setSavedDecks(localDecks);
+      } finally {
+        if (!cancelled) setIsLoadingDecks(false);
+      }
+    }
+
+    loadDecks();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
 
   async function generateDeck() {
     setIsGenerating(true);
@@ -84,7 +118,13 @@ export function DeckBuilder() {
 
       if (!response.ok) throw new Error(await readErrorMessage(response, "生成に失敗しました"));
       const data = (await response.json()) as { deck: Deck };
-      setDeck(data.deck);
+      const generatedDeck = { ...data.deck, userId: currentUser };
+      setDeck(generatedDeck);
+      setSavedDecks((current) => {
+        const next = mergeDecks([generatedDeck, ...current]).slice(0, 30);
+        saveLocalDecks(currentUser, next);
+        return next;
+      });
       setSelectedIndex(0);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "生成に失敗しました");
@@ -111,10 +151,16 @@ export function DeckBuilder() {
 
       if (!response.ok) throw new Error(await readErrorMessage(response, "スライド再生成に失敗しました"));
       const data = (await response.json()) as { slide: Slide };
-      setDeck({
+      const updatedDeck = {
         ...deck,
         slides: deck.slides.map((item) => (item.id === slide.id ? data.slide : item)),
         updatedAt: new Date().toISOString()
+      };
+      setDeck(updatedDeck);
+      setSavedDecks((current) => {
+        const next = mergeDecks([updatedDeck, ...current]).slice(0, 30);
+        saveLocalDecks(currentUser, next);
+        return next;
       });
     } catch (regenerationError) {
       setError(regenerationError instanceof Error ? regenerationError.message : "スライド再生成に失敗しました");
@@ -163,6 +209,12 @@ export function DeckBuilder() {
     patchInput({ templateSource, templateId: nextTemplates[0]?.id ?? templates[0].id });
   }
 
+  function openSavedDeck(savedDeck: Deck) {
+    setDeck(savedDeck);
+    setSelectedIndex(0);
+    if (savedDeck.settings) setInput(savedDeck.settings);
+  }
+
   return (
     <main className="app-shell">
       <aside className="control-panel">
@@ -173,6 +225,32 @@ export function DeckBuilder() {
             <h1>AIスライド生成</h1>
           </div>
         </div>
+
+        <section className="field-group deck-library" aria-label="マイフォルダ">
+          <SectionTitle icon={<FolderOpen size={16} />} label="マイフォルダ" />
+          <div className="user-folder">
+            <UserRound size={15} />
+            <span>{currentUser}</span>
+            <small>{savedDecks.length}件</small>
+          </div>
+          <div className="saved-deck-list">
+            {isLoadingDecks ? <p className="muted-text">読み込み中...</p> : null}
+            {!isLoadingDecks && savedDecks.length === 0 ? <p className="muted-text">生成するとここに保存されます。</p> : null}
+            {savedDecks.slice(0, 8).map((savedDeck) => (
+              <button
+                key={savedDeck.id}
+                type="button"
+                className={deck?.id === savedDeck.id ? "saved-deck active" : "saved-deck"}
+                onClick={() => openSavedDeck(savedDeck)}
+              >
+                <strong>{savedDeck.title}</strong>
+                <span>
+                  {savedDeck.mode.toUpperCase()} / {savedDeck.slideCount}枚 / {formatDate(savedDeck.updatedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="field-group" aria-label="生成モード">
           <SectionTitle icon={<MonitorPlay size={16} />} label="出力モード" />
@@ -557,4 +635,71 @@ async function readErrorMessage(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+function storageKey(user: string) {
+  return `codex-slide:decks:${user}`;
+}
+
+function loadLocalDecks(user: string) {
+  try {
+    const raw = window.localStorage.getItem(storageKey(user));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Deck[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalDecks(user: string, decks: Deck[]) {
+  try {
+    window.localStorage.setItem(storageKey(user), JSON.stringify(decks.map(slimDeckForLocalStorage)));
+  } catch {
+    try {
+      window.localStorage.setItem(storageKey(user), JSON.stringify(decks.slice(0, 10).map(slimDeckForLocalStorage)));
+    } catch {
+      console.warn("Local deck library save failed");
+    }
+  }
+}
+
+function slimDeckForLocalStorage(deck: Deck): Deck {
+  return {
+    ...deck,
+    slides: deck.slides.map((slide) => ({
+      ...slide,
+      imageUrl: slide.imageUrl?.startsWith("data:image") ? undefined : slide.imageUrl
+    }))
+  };
+}
+
+function mergeDecks(decks: Deck[]) {
+  const map = new Map<string, Deck>();
+  for (const deck of decks) {
+    const existing = map.get(deck.id);
+    if (!existing || new Date(deck.updatedAt).getTime() > new Date(existing.updatedAt).getTime()) {
+      map.set(deck.id, deck);
+    }
+  }
+
+  return [...map.values()].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
+function readCookie(name: string) {
+  const item = document.cookie
+    .split(";")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(`${name}=`));
+  return item ? decodeURIComponent(item.slice(name.length + 1)) : "";
+}
+
+function formatDate(value: string) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
 }

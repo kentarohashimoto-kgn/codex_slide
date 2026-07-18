@@ -40,6 +40,14 @@ BASIC_AUTH_PASSWORD=
 
 In development, Basic Auth is skipped when these variables are empty. In production, requests return `503` until both values are configured.
 
+For multiple personal folders, set `BASIC_AUTH_USERS` instead:
+
+```text
+BASIC_AUTH_USERS={"kenta":"password1","staff":"password2"}
+```
+
+The Basic Auth username is used as the personal deck folder key. Generated decks are saved to that user's browser storage immediately, and to Supabase as well when Supabase environment variables and the deck-library migration are configured.
+
 ## Supabase
 
 Run the SQL in `supabase/migrations/202607180001_initial_schema.sql` in your Supabase project. Add the Supabase URL and keys to Vercel environment variables.

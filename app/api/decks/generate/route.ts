@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateDeck } from "@/lib/openai";
+import { getRequestUser } from "@/lib/request-user";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getTemplatesBySource } from "@/lib/templates";
 import type { Deck, DeckGenerationRequest } from "@/lib/types";
@@ -11,9 +12,11 @@ export async function POST(request: Request) {
   try {
     const input = normalizeInput((await request.json()) as Partial<DeckGenerationRequest>);
     const deck = await generateDeck(input);
-    await persistDeck(deck);
+    const user = getRequestUser(request);
+    const userDeck = { ...deck, userId: user };
+    await persistDeck(userDeck, user);
 
-    return NextResponse.json({ deck });
+    return NextResponse.json({ deck: userDeck });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -68,17 +71,19 @@ function normalizeInput(input: Partial<DeckGenerationRequest>): DeckGenerationRe
   };
 }
 
-async function persistDeck(deck: Deck) {
+async function persistDeck(deck: Deck, user = deck.userId ?? "default") {
   const supabase = getSupabaseAdmin();
   if (!supabase) return;
 
   const { error: deckError } = await supabase.from("decks").upsert({
     id: deck.id,
+    basic_user: user,
     title: deck.title,
     purpose: deck.purpose,
     audience: deck.audience,
     mode: deck.mode,
     template_id: deck.templateId,
+    settings: deck.settings,
     status: deck.status,
     slide_count: deck.slideCount,
     created_at: deck.createdAt,
