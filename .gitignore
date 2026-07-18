@@ -1,0 +1,10 @@
+.next/
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+vercel-env-pull.log
+_tmp/
