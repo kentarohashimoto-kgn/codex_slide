@@ -8,3 +8,5 @@ coverage/
 *.tsbuildinfo
 vercel-env-pull.log
 _tmp/
+
+.vercel
