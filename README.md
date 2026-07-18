@@ -20,7 +20,17 @@ Create `.env.local` from `.env.example`.
 
 The app works in demo mode without API keys. Set `OPENAI_API_KEY` to enable AI outline/HTML generation. Set `OPENAI_IMAGE_GENERATION_ENABLED=true` to allow paid image generation calls.
 
+## Basic Auth
+
+Set these environment variables in Vercel to protect the app:
+
+```text
+BASIC_AUTH_USERNAME=
+BASIC_AUTH_PASSWORD=
+```
+
+In development, Basic Auth is skipped when these variables are empty. In production, requests return `503` until both values are configured.
+
 ## Supabase
 
 Run the SQL in `supabase/migrations/202607180001_initial_schema.sql` in your Supabase project. Add the Supabase URL and keys to Vercel environment variables.
-

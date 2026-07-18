@@ -22,6 +22,8 @@ OPENAI_TEXT_MODEL=gpt-5.6-terra
 OPENAI_IMAGE_MODEL=gpt-image-2
 OPENAI_IMAGE_GENERATION_ENABLED=false
 APP_BASE_URL=http://localhost:3000
+BASIC_AUTH_USERNAME=codex
+BASIC_AUTH_PASSWORD=change-this-password
 ```
 
 ## Notes
@@ -29,4 +31,4 @@ APP_BASE_URL=http://localhost:3000
 - The app intentionally works without OpenAI and Supabase credentials so UI and export behavior can be checked immediately.
 - Paid image generation is guarded by `OPENAI_IMAGE_GENERATION_ENABLED=true`.
 - The first production hardening step should be moving deck persistence behind authenticated Supabase user context instead of demo-mode anonymous generation.
-
+- Production access is protected by HTTP Basic Auth when `BASIC_AUTH_USERNAME` and `BASIC_AUTH_PASSWORD` are configured.
