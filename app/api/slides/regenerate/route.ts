@@ -3,7 +3,7 @@ import { regenerateSlide } from "@/lib/openai";
 import type { DeckGenerationRequest, Slide } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 type RegenerateRequest = {
   deckInput: DeckGenerationRequest;
@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ slide });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Slide regeneration failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Slide regeneration failed" },
+      { status: 500 }
+    );
   }
 }
-

@@ -82,7 +82,7 @@ export function DeckBuilder() {
         body: JSON.stringify({ ...input, totalPages: Math.max(input.totalPages, input.slideCount) })
       });
 
-      if (!response.ok) throw new Error("生成に失敗しました");
+      if (!response.ok) throw new Error(await readErrorMessage(response, "生成に失敗しました"));
       const data = (await response.json()) as { deck: Deck };
       setDeck(data.deck);
       setSelectedIndex(0);
@@ -109,7 +109,7 @@ export function DeckBuilder() {
         })
       });
 
-      if (!response.ok) throw new Error("スライド再生成に失敗しました");
+      if (!response.ok) throw new Error(await readErrorMessage(response, "スライド再生成に失敗しました"));
       const data = (await response.json()) as { slide: Slide };
       setDeck({
         ...deck,
@@ -548,4 +548,13 @@ function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
       <span>{label}</span>
     </div>
   );
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const data = (await response.json()) as { error?: string };
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
 }

@@ -25,7 +25,9 @@ npm run dev
 
 Create `.env.local` from `.env.example`.
 
-The app works in demo mode without API keys. Set `OPENAI_API_KEY` to enable AI outline/HTML generation. Set `OPENAI_IMAGE_GENERATION_ENABLED=true` to allow paid image generation calls.
+The app works in demo mode without API keys. Set `OPENAI_API_KEY` to enable real AI outline generation, per-slide HTML generation, and image generation.
+
+Set `OPENAI_IMAGE_GENERATION_ENABLED=false` only when you want image mode to use the local SVG preview fallback instead of paid GPT Image 2 calls. `OPENAI_IMAGE_QUALITY=low` is recommended while testing.
 
 ## Basic Auth
 
