@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Building2,
   Download,
@@ -67,6 +67,7 @@ export function DeckBuilder() {
   const [savedDecks, setSavedDecks] = useState<Deck[]>([]);
   const [isLoadingDecks, setIsLoadingDecks] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const deepLinkLoadedRef = useRef(false);
 
   const availableTemplates = useMemo(() => getTemplatesBySource(input.templateSource), [input.templateSource]);
   const selectedTemplate = useMemo(
@@ -103,6 +104,21 @@ export function DeckBuilder() {
       cancelled = true;
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (deepLinkLoadedRef.current || isLoadingDecks || savedDecks.length === 0) return;
+
+    const deckId = new URLSearchParams(window.location.search).get("deck");
+    if (!deckId) return;
+
+    const deepLinkedDeck = savedDecks.find((savedDeck) => savedDeck.id === deckId);
+    if (!deepLinkedDeck) return;
+
+    deepLinkLoadedRef.current = true;
+    setDeck(deepLinkedDeck);
+    setSelectedIndex(readInitialPageIndex(deepLinkedDeck.slides.length));
+    if (deepLinkedDeck.settings) setInput(deepLinkedDeck.settings);
+  }, [isLoadingDecks, savedDecks]);
 
   async function generateDeck() {
     setIsGenerating(true);
@@ -212,6 +228,14 @@ export function DeckBuilder() {
     setDeck(savedDeck);
     setSelectedIndex(0);
     if (savedDeck.settings) setInput(savedDeck.settings);
+    updateDeckUrl(savedDeck.id, 1);
+  }
+
+  function selectSlide(index: number) {
+    if (!deck) return;
+    const nextIndex = Math.min(Math.max(index, 0), deck.slides.length - 1);
+    setSelectedIndex(nextIndex);
+    updateDeckUrl(deck.id, nextIndex + 1);
   }
 
   return (
@@ -609,7 +633,7 @@ export function DeckBuilder() {
         <DeckViewer
           deck={deck}
           selectedIndex={selectedIndex}
-          onSelect={setSelectedIndex}
+          onSelect={selectSlide}
           onRegenerate={regenerateSlide}
           regeneratingSlideId={regeneratingSlideId}
         />
@@ -688,6 +712,23 @@ function saveLocalDecks(user: string, decks: Deck[]) {
       console.warn("Local deck library save failed");
     }
   }
+}
+
+function readInitialPageIndex(slideCount: number) {
+  const searchParams = new URLSearchParams(window.location.search);
+  const pageFromQuery = Number(searchParams.get("page"));
+  const pageFromHash = Number(window.location.hash.match(/^#page-(\d+)$/)?.[1]);
+  const page = Number.isFinite(pageFromQuery) && pageFromQuery > 0 ? pageFromQuery : pageFromHash;
+
+  if (!Number.isFinite(page) || page < 1) return 0;
+  return Math.min(page - 1, Math.max(slideCount - 1, 0));
+}
+
+function updateDeckUrl(deckId: string, pageNo: number) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("deck", deckId);
+  url.hash = `page-${pageNo}`;
+  window.history.replaceState(null, "", url);
 }
 
 function slimDeckForLocalStorage(deck: Deck): Deck {
