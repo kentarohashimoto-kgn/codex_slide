@@ -643,7 +643,10 @@ async function fetchServerDecks() {
 }
 
 async function fetchBundledDecks(user: string) {
-  const bundledPaths = ["/generated-decks/kojima-material-poc/deck.json"];
+  const bundledPaths = [
+    "/generated-decks/kojima-material-poc/deck.json",
+    "/generated-decks/ai-webinar-1hour/deck.json",
+  ];
   const decks: Array<Deck | null> = await Promise.all(
     bundledPaths.map(async (path) => {
       try {
