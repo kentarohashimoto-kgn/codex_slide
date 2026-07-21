@@ -62,9 +62,11 @@ export function DeckBuilder() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingBundle, setIsExportingBundle] = useState(false);
   const [regeneratingSlideId, setRegeneratingSlideId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState("default");
   const [savedDecks, setSavedDecks] = useState<Deck[]>([]);
+  const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
   const [isLoadingDecks, setIsLoadingDecks] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const deepLinkLoadedRef = useRef(false);
@@ -74,6 +76,14 @@ export function DeckBuilder() {
     () => templates.find((template) => template.id === input.templateId) ?? availableTemplates[0] ?? templates[0],
     [availableTemplates, input.templateId]
   );
+  const visibleSavedDecks = useMemo(() => savedDecks.slice(0, 8), [savedDecks]);
+  const selectedFolderDecks = useMemo(
+    () => savedDecks.filter((savedDeck) => selectedDeckIds.includes(savedDeck.id)),
+    [savedDecks, selectedDeckIds]
+  );
+  const selectedFolderSlideCount = selectedFolderDecks.reduce((total, savedDeck) => total + savedDeck.slides.length, 0);
+  const isAllVisibleSelected =
+    visibleSavedDecks.length > 0 && visibleSavedDecks.every((savedDeck) => selectedDeckIds.includes(savedDeck.id));
   const pageEnd = input.pageNumberOffset + input.slideCount - 1;
   const pageNumberWarning = input.splitPagination && input.showPageNumber && pageEnd > input.totalPages;
 
@@ -211,6 +221,37 @@ export function DeckBuilder() {
     }
   }
 
+  async function exportSelectedDecks() {
+    if (selectedFolderDecks.length === 0) return;
+    setIsExportingBundle(true);
+    setError(null);
+
+    try {
+      const title =
+        selectedFolderDecks.length === 1
+          ? selectedFolderDecks[0].title
+          : `Codex Slideまとめ_${new Date().toISOString().slice(0, 10)}`;
+      const response = await fetch("/api/decks/export-bundle-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, decks: selectedFolderDecks })
+      });
+
+      if (!response.ok) throw new Error(await readErrorMessage(response, "選択したスライドセットのPPTX出力に失敗しました"));
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${title}.pptx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "選択したスライドセットのPPTX出力に失敗しました");
+    } finally {
+      setIsExportingBundle(false);
+    }
+  }
+
   function patchInput(patch: Partial<DeckGenerationRequest>) {
     setInput((current) => ({ ...current, ...patch }));
   }
@@ -229,6 +270,21 @@ export function DeckBuilder() {
     setSelectedIndex(0);
     if (savedDeck.settings) setInput(savedDeck.settings);
     updateDeckUrl(savedDeck.id, 1);
+  }
+
+  function toggleSavedDeckSelection(deckId: string) {
+    setSelectedDeckIds((current) =>
+      current.includes(deckId) ? current.filter((currentId) => currentId !== deckId) : [...current, deckId]
+    );
+  }
+
+  function toggleAllVisibleDecks() {
+    if (isAllVisibleSelected) {
+      setSelectedDeckIds((current) => current.filter((deckId) => !visibleSavedDecks.some((savedDeck) => savedDeck.id === deckId)));
+      return;
+    }
+
+    setSelectedDeckIds((current) => Array.from(new Set([...current, ...visibleSavedDecks.map((savedDeck) => savedDeck.id)])));
   }
 
   function selectSlide(index: number) {
@@ -259,20 +315,43 @@ export function DeckBuilder() {
           <div className="saved-deck-list">
             {isLoadingDecks ? <p className="muted-text">読み込み中...</p> : null}
             {!isLoadingDecks && savedDecks.length === 0 ? <p className="muted-text">生成するとここに保存されます。</p> : null}
-            {savedDecks.slice(0, 8).map((savedDeck) => (
-              <button
-                key={savedDeck.id}
-                type="button"
-                className={deck?.id === savedDeck.id ? "saved-deck active" : "saved-deck"}
-                onClick={() => openSavedDeck(savedDeck)}
-              >
-                <strong>{savedDeck.title}</strong>
-                <span>
-                  {savedDeck.mode.toUpperCase()} / {savedDeck.slideCount}枚 / {formatDate(savedDeck.updatedAt)}
-                </span>
-              </button>
+            {visibleSavedDecks.map((savedDeck) => (
+              <div key={savedDeck.id} className={deck?.id === savedDeck.id ? "saved-deck-row active" : "saved-deck-row"}>
+                <label className="deck-select" title="統合PPTXに含める">
+                  <input
+                    type="checkbox"
+                    checked={selectedDeckIds.includes(savedDeck.id)}
+                    onChange={() => toggleSavedDeckSelection(savedDeck.id)}
+                    aria-label={`${savedDeck.title}を統合PPTXに含める`}
+                  />
+                </label>
+                <button type="button" className="saved-deck" onClick={() => openSavedDeck(savedDeck)}>
+                  <strong>{savedDeck.title}</strong>
+                  <span>
+                    {savedDeck.mode.toUpperCase()} / {savedDeck.slideCount}枚 / {formatDate(savedDeck.updatedAt)}
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
+          <div className="library-actions">
+            <button type="button" className="mini-button" onClick={toggleAllVisibleDecks} disabled={visibleSavedDecks.length === 0}>
+              {isAllVisibleSelected ? "表示分を解除" : "表示分を選択"}
+            </button>
+            <button
+              type="button"
+              className="mini-button primary"
+              onClick={exportSelectedDecks}
+              disabled={selectedFolderDecks.length === 0 || isExportingBundle}
+              title="選択したスライドセットを1つのPPTXに統合してダウンロード"
+            >
+              {isExportingBundle ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
+              統合PPTX
+            </button>
+          </div>
+          <p className="muted-text">
+            選択中: {selectedFolderDecks.length}件 / {selectedFolderSlideCount}枚
+          </p>
         </section>
 
         <section className="field-group" aria-label="生成モード">
@@ -615,8 +694,16 @@ export function DeckBuilder() {
             {isGenerating ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
             生成
           </button>
-          <button className="icon-button" type="button" onClick={exportPptx} disabled={!deck || isExporting} title="PPTXをダウンロード">
+          <button
+            className="icon-button"
+            type="button"
+            onClick={exportPptx}
+            disabled={!deck || isExporting}
+            title="表示中の最終成果物をPPTXでダウンロード"
+            aria-label="表示中の最終成果物をPPTXでダウンロード"
+          >
             {isExporting ? <Loader2 className="spin" size={18} /> : <Download size={18} />}
+            PPTX
           </button>
         </div>
 

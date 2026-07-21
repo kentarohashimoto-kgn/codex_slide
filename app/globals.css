@@ -147,8 +147,42 @@ button {
   gap: 7px;
 }
 
+.saved-deck-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+}
+
+.saved-deck-row.active .saved-deck {
+  color: #fffaf2;
+  border-color: rgba(98, 216, 192, 0.55);
+  background: rgba(98, 216, 192, 0.1);
+}
+
+.deck-select {
+  width: 34px;
+  min-height: 100%;
+  display: grid !important;
+  place-items: center;
+  gap: 0 !important;
+  color: rgba(251, 248, 241, 0.74) !important;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.deck-select input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 .saved-deck {
   min-width: 0;
+  width: 100%;
   display: grid;
   gap: 4px;
   padding: 10px;
@@ -158,12 +192,6 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 8px;
   cursor: pointer;
-}
-
-.saved-deck.active {
-  color: #fffaf2;
-  border-color: rgba(98, 216, 192, 0.55);
-  background: rgba(98, 216, 192, 0.1);
 }
 
 .saved-deck strong,
@@ -188,6 +216,33 @@ button {
 
 .muted-text {
   margin: 0;
+}
+
+.library-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.mini-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: rgba(251, 248, 241, 0.78);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mini-button.primary {
+  color: var(--ink);
+  background: var(--accent);
+  border-color: transparent;
 }
 
 .field-group label {
@@ -505,7 +560,7 @@ select:focus {
 
 .action-row {
   display: grid;
-  grid-template-columns: 1fr 48px;
+  grid-template-columns: 1fr 112px;
   gap: 9px;
   margin-top: 16px;
 }
@@ -529,7 +584,8 @@ select:focus {
 .template-option:hover,
 .template-card:hover,
 .count-grid button:hover,
-.saved-deck:hover {
+.saved-deck:hover,
+.mini-button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
