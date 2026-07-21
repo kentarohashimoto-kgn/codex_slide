@@ -8,6 +8,7 @@ coverage/
 *.tsbuildinfo
 vercel-env-pull.log
 _tmp/
+.tmp/
 _tmp_ref_slide_builder.*
 
 .vercel

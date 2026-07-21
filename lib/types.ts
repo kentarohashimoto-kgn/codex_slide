@@ -94,6 +94,60 @@ export type Deck = {
   updatedAt: string;
 };
 
+export type ShareAdConfig = {
+  kind: "none" | "text" | "image";
+  text?: string;
+  imageUrl?: string;
+  linkUrl?: string;
+};
+
+export type PublicShare = {
+  token: string;
+  basicUser: string;
+  deckId: string;
+  title: string;
+  deck: Deck;
+  adConfig: ShareAdConfig;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicShareSummary = {
+  token: string;
+  deckId: string;
+  title: string;
+  slideCount: number;
+  isPublic: boolean;
+  adConfig: ShareAdConfig;
+  viewCount: number;
+  viewerCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ShareAnalytics = {
+  token: string;
+  title: string;
+  totalViews: number;
+  uniqueViewers: number;
+  adClicks: number;
+  pageViews: Array<{
+    pageNo: number;
+    title: string;
+    views: number;
+    uniqueViewers: number;
+    totalSeconds: number;
+  }>;
+  recentEvents: Array<{
+    eventType: "page_view" | "page_duration" | "ad_click";
+    pageNo: number;
+    viewerId: string;
+    viewerLabel?: string;
+    createdAt: string;
+  }>;
+};
+
 export type DeckGenerationRequest = {
   title: string;
   purpose: string;

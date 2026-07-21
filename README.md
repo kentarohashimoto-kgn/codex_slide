@@ -9,6 +9,8 @@ The MVP supports two generation modes:
 
 Both modes can be exported as PPTX.
 
+Shared decks can be published to a read-only viewer URL with page-view logging, page-duration logging, ad-click logging, and an admin-side ad slot.
+
 The deck builder now includes richer slide creation controls:
 
 - Visual style presets split into system templates and company-only templates.
@@ -50,4 +52,11 @@ The Basic Auth username is used as the personal deck folder key. Generated decks
 
 ## Supabase
 
-Run the SQL in `supabase/migrations/202607180001_initial_schema.sql` in your Supabase project. Add the Supabase URL and keys to Vercel environment variables.
+Run the SQL files in `supabase/migrations/` in your Supabase project. Add these variables to Vercel:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+`202607220001_public_shares.sql` is required for the share/public viewer feature. Without Supabase, the production app can still generate and preview decks, but public share URLs and view analytics cannot be persisted.

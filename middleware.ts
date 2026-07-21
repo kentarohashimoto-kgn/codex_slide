@@ -4,6 +4,10 @@ import { NextResponse } from "next/server";
 const REALM = "Codex Slide";
 
 export function middleware(request: NextRequest) {
+  if (isPublicRoute(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   const users = getBasicAuthUsers();
 
   if (users.length === 0) {
@@ -46,6 +50,14 @@ export function middleware(request: NextRequest) {
       "Cache-Control": "no-store"
     }
   });
+}
+
+function isPublicRoute(pathname: string) {
+  return (
+    pathname.startsWith("/share/") ||
+    pathname.startsWith("/api/public-shares/") ||
+    pathname.startsWith("/generated-decks/")
+  );
 }
 
 function getBasicAuthUsers() {

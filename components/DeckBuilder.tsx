@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  BarChart3,
   Building2,
+  Copy,
   Download,
+  ExternalLink,
   FileCode2,
   FolderOpen,
   Hash,
@@ -12,13 +15,14 @@ import {
   Loader2,
   MonitorPlay,
   Palette,
+  Share2,
   SlidersHorizontal,
   Sparkles,
   Type,
   UserRound
 } from "lucide-react";
 import { getTemplatesBySource, templates } from "@/lib/templates";
-import type { Deck, DeckGenerationRequest, DeckMode, Slide, TemplateSource } from "@/lib/types";
+import type { Deck, DeckGenerationRequest, DeckMode, PublicShareSummary, ShareAdConfig, ShareAnalytics, Slide, TemplateSource } from "@/lib/types";
 import { DeckViewer } from "@/components/DeckViewer";
 
 const slideCountOptions = [5, 8, 10, 12, 15, 18, 24];
@@ -67,6 +71,12 @@ export function DeckBuilder() {
   const [currentUser, setCurrentUser] = useState("default");
   const [savedDecks, setSavedDecks] = useState<Deck[]>([]);
   const [selectedDeckIds, setSelectedDeckIds] = useState<string[]>([]);
+  const [publicShares, setPublicShares] = useState<PublicShareSummary[]>([]);
+  const [currentShare, setCurrentShare] = useState<PublicShareSummary | null>(null);
+  const [shareAnalytics, setShareAnalytics] = useState<ShareAnalytics | null>(null);
+  const [shareAdConfig, setShareAdConfig] = useState<ShareAdConfig>({ kind: "none", text: "", imageUrl: "", linkUrl: "" });
+  const [isSharing, setIsSharing] = useState(false);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [isLoadingDecks, setIsLoadingDecks] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const deepLinkLoadedRef = useRef(false);
@@ -110,6 +120,26 @@ export function DeckBuilder() {
     }
 
     loadDecks();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadShares() {
+      try {
+        const response = await fetch("/api/shares", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as { shares?: PublicShareSummary[] };
+        if (!cancelled) setPublicShares(data.shares ?? []);
+      } catch {
+        if (!cancelled) setPublicShares([]);
+      }
+    }
+
+    loadShares();
     return () => {
       cancelled = true;
     };
@@ -252,6 +282,83 @@ export function DeckBuilder() {
     }
   }
 
+  async function createShareLink() {
+    if (!deck) return;
+    setIsSharing(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/shares", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deck, adConfig: shareAdConfig })
+      });
+
+      if (!response.ok) throw new Error(await readErrorMessage(response, "共有リンクの作成に失敗しました"));
+      const data = (await response.json()) as { share: { token: string; title: string; deckId: string; deck: Deck; adConfig: ShareAdConfig; isPublic: boolean; createdAt: string; updatedAt: string } };
+      const summary = {
+        token: data.share.token,
+        deckId: data.share.deckId,
+        title: data.share.title,
+        slideCount: data.share.deck.slides.length,
+        isPublic: data.share.isPublic,
+        adConfig: data.share.adConfig,
+        viewCount: 0,
+        viewerCount: 0,
+        createdAt: data.share.createdAt,
+        updatedAt: data.share.updatedAt
+      };
+      setCurrentShare(summary);
+      setPublicShares((current) => [summary, ...current.filter((share) => share.token !== summary.token)].slice(0, 20));
+      setShareAnalytics(null);
+      await copyShareUrl(summary.token);
+    } catch (shareError) {
+      setError(shareError instanceof Error ? shareError.message : "共有リンクの作成に失敗しました");
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  async function updateShareAd() {
+    if (!currentShare) return;
+    setIsSharing(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/shares/${currentShare.token}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adConfig: shareAdConfig })
+      });
+      if (!response.ok) throw new Error(await readErrorMessage(response, "広告設定の更新に失敗しました"));
+      const updated = { ...currentShare, adConfig: shareAdConfig, updatedAt: new Date().toISOString() };
+      setCurrentShare(updated);
+      setPublicShares((current) => current.map((share) => (share.token === updated.token ? updated : share)));
+    } catch (shareError) {
+      setError(shareError instanceof Error ? shareError.message : "広告設定の更新に失敗しました");
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  async function loadShareAnalytics(share: PublicShareSummary) {
+    setCurrentShare(share);
+    setShareAdConfig(share.adConfig);
+    setIsLoadingAnalytics(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/shares/${share.token}/analytics`, { cache: "no-store" });
+      if (!response.ok) throw new Error(await readErrorMessage(response, "閲覧分析の取得に失敗しました"));
+      const data = (await response.json()) as { analytics: ShareAnalytics };
+      setShareAnalytics(data.analytics);
+    } catch (analyticsError) {
+      setError(analyticsError instanceof Error ? analyticsError.message : "閲覧分析の取得に失敗しました");
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  }
+
   function patchInput(patch: Partial<DeckGenerationRequest>) {
     setInput((current) => ({ ...current, ...patch }));
   }
@@ -352,6 +459,81 @@ export function DeckBuilder() {
           <p className="muted-text">
             選択中: {selectedFolderDecks.length}件 / {selectedFolderSlideCount}枚
           </p>
+        </section>
+
+        <section className="field-group share-panel" aria-label="共有と公開">
+          <SectionTitle icon={<Share2 size={16} />} label="共有・公開" />
+          <p className="muted-text">表示中の資料を、参照専用URLとして第三者に共有できます。</p>
+          <div className="segmented three" role="tablist" aria-label="広告タイプ">
+            {(["none", "text", "image"] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                className={shareAdConfig.kind === kind ? "active" : ""}
+                onClick={() => setShareAdConfig((current) => ({ ...current, kind }))}
+                aria-pressed={shareAdConfig.kind === kind}
+              >
+                {kind === "none" ? "広告なし" : kind === "text" ? "テキスト" : "画像"}
+              </button>
+            ))}
+          </div>
+          {shareAdConfig.kind !== "none" ? (
+            <>
+              <label>
+                告知テキスト
+                <input value={shareAdConfig.text ?? ""} onChange={(event) => setShareAdConfig((current) => ({ ...current, text: event.target.value }))} />
+              </label>
+              {shareAdConfig.kind === "image" ? (
+                <label>
+                  広告画像URL
+                  <input value={shareAdConfig.imageUrl ?? ""} onChange={(event) => setShareAdConfig((current) => ({ ...current, imageUrl: event.target.value }))} />
+                </label>
+              ) : null}
+              <label>
+                クリック遷移先URL
+                <input value={shareAdConfig.linkUrl ?? ""} onChange={(event) => setShareAdConfig((current) => ({ ...current, linkUrl: event.target.value }))} />
+              </label>
+            </>
+          ) : null}
+          <div className="library-actions">
+            <button type="button" className="mini-button primary" onClick={createShareLink} disabled={!deck || isSharing}>
+              {isSharing ? <Loader2 className="spin" size={15} /> : <Share2 size={15} />}
+              公開URL作成
+            </button>
+            <button type="button" className="mini-button" onClick={updateShareAd} disabled={!currentShare || isSharing}>
+              広告更新
+            </button>
+          </div>
+          {currentShare ? (
+            <div className="share-url-box">
+              <input readOnly value={shareUrlFor(currentShare.token)} />
+              <button type="button" className="mini-button" onClick={() => copyShareUrl(currentShare.token)} title="共有URLをコピー">
+                <Copy size={15} />
+              </button>
+              <a className="mini-button" href={shareUrlFor(currentShare.token)} target="_blank" rel="noreferrer" title="共有ビューアーを開く">
+                <ExternalLink size={15} />
+              </a>
+            </div>
+          ) : null}
+          {publicShares.length > 0 ? (
+            <div className="share-list">
+              {publicShares.slice(0, 5).map((share) => (
+                <button key={share.token} type="button" className="share-list-item" onClick={() => loadShareAnalytics(share)}>
+                  <strong>{share.title}</strong>
+                  <span>
+                    {share.slideCount}枚 / {share.viewCount}PV / {share.viewerCount}人
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {currentShare ? (
+            <button type="button" className="mini-button" onClick={() => loadShareAnalytics(currentShare)} disabled={isLoadingAnalytics}>
+              {isLoadingAnalytics ? <Loader2 className="spin" size={15} /> : <BarChart3 size={15} />}
+              分析を更新
+            </button>
+          ) : null}
+          {shareAnalytics ? <ShareAnalyticsPanel analytics={shareAnalytics} /> : null}
         </section>
 
         <section className="field-group" aria-label="生成モード">
@@ -738,6 +920,43 @@ function SectionTitle({ icon, label }: { icon: ReactNode; label: string }) {
   );
 }
 
+function ShareAnalyticsPanel({ analytics }: { analytics: ShareAnalytics }) {
+  return (
+    <div className="analytics-panel">
+      <div className="analytics-stats">
+        <span>
+          <strong>{analytics.totalViews}</strong>
+          PV
+        </span>
+        <span>
+          <strong>{analytics.uniqueViewers}</strong>
+          人
+        </span>
+        <span>
+          <strong>{analytics.adClicks}</strong>
+          Click
+        </span>
+      </div>
+      <div className="page-view-list">
+        {analytics.pageViews.slice(0, 8).map((page) => (
+          <div key={page.pageNo}>
+            <span>{String(page.pageNo).padStart(2, "0")}</span>
+            <strong>{page.views}PV / {formatSeconds(page.totalSeconds)}</strong>
+            <small>{page.uniqueViewers}人</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatSeconds(totalSeconds: number) {
+  if (totalSeconds < 60) return `${totalSeconds}秒`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}分${seconds}秒`;
+}
+
 async function readErrorMessage(response: Response, fallback: string) {
   try {
     const data = (await response.json()) as { error?: string };
@@ -816,6 +1035,25 @@ function updateDeckUrl(deckId: string, pageNo: number) {
   url.searchParams.set("deck", deckId);
   url.hash = `page-${pageNo}`;
   window.history.replaceState(null, "", url);
+}
+
+function shareUrlFor(token: string) {
+  if (typeof window === "undefined") return `/share/${token}`;
+  return `${window.location.origin}/share/${token}`;
+}
+
+async function copyShareUrl(token: string) {
+  const url = shareUrlFor(token);
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    const input = document.createElement("input");
+    input.value = url;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand("copy");
+    input.remove();
+  }
 }
 
 function slimDeckForLocalStorage(deck: Deck): Deck {
