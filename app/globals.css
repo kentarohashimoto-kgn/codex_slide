@@ -142,6 +142,64 @@ button {
   font-weight: 900;
 }
 
+.upload-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.upload-drop {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #fffaf2;
+  background: rgba(98, 216, 192, 0.08);
+  border: 1px dashed rgba(98, 216, 192, 0.44);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.upload-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upload-drop.disabled {
+  opacity: 0.62;
+  cursor: wait;
+}
+
+.import-progress {
+  display: grid;
+  gap: 5px;
+}
+
+.import-progress div {
+  height: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.import-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 180ms ease;
+}
+
+.import-progress small {
+  color: rgba(251, 248, 241, 0.62);
+  font-size: 10px;
+}
+
 .saved-deck-list {
   display: grid;
   gap: 7px;

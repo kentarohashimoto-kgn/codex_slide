@@ -19,11 +19,13 @@ import {
   SlidersHorizontal,
   Sparkles,
   Type,
+  UploadCloud,
   UserRound
 } from "lucide-react";
 import { getTemplatesBySource, templates } from "@/lib/templates";
-import type { Deck, DeckGenerationRequest, DeckMode, PublicShareSummary, ShareAdConfig, ShareAnalytics, Slide, TemplateSource } from "@/lib/types";
+import type { AspectRatio, Deck, DeckGenerationRequest, DeckMode, PublicShareSummary, ShareAdConfig, ShareAnalytics, Slide, TemplateSource } from "@/lib/types";
 import { DeckViewer } from "@/components/DeckViewer";
+import type { PDFPageProxy } from "pdfjs-dist";
 
 const slideCountOptions = [5, 8, 10, 12, 15, 18, 24];
 
@@ -78,6 +80,9 @@ export function DeckBuilder() {
   const [isSharing, setIsSharing] = useState(false);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [isLoadingDecks, setIsLoadingDecks] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importMessage, setImportMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const deepLinkLoadedRef = useRef(false);
 
@@ -403,6 +408,51 @@ export function DeckBuilder() {
     setPublicShares(await fetchPublicShares());
   }
 
+  async function importExistingDeck(file: File | null) {
+    if (!file) return;
+    setError(null);
+    setImportProgress(0);
+    setImportMessage("");
+
+    if (isPptxFile(file)) {
+      setError("PPTXの見た目を完全に保った画像化は、Vercel単体では変換エンジンが必要です。PowerPointでPDFとして保存してからアップロードしてください。PDFはそのままマイフォルダ・公開ビューアー・ログ分析に対応します。");
+      return;
+    }
+    if (!isPdfFile(file)) {
+      setError("PDFまたはPPTXを選択してください。現在、公開ビューアー用の高再現取り込みはPDFに対応しています。");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportMessage("PDFを読み込んでいます...");
+
+    try {
+      const importedDeck = await importPdfDeck(file, {
+        onProgress: (progress, message) => {
+          setImportProgress(progress);
+          setImportMessage(message);
+        }
+      });
+
+      const userDeck = { ...importedDeck, userId: currentUser };
+      setDeck(userDeck);
+      setSelectedIndex(0);
+      if (userDeck.settings) setInput(userDeck.settings);
+      setSavedDecks((current) => {
+        const next = mergeDecks([userDeck, ...current]).slice(0, 30);
+        saveLocalDecks(currentUser, next);
+        return next;
+      });
+      updateDeckUrl(userDeck.id, 1);
+      setImportProgress(100);
+      setImportMessage("マイフォルダに保存しました。");
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "資料の取り込みに失敗しました");
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="control-panel">
@@ -420,6 +470,31 @@ export function DeckBuilder() {
             <UserRound size={15} />
             <span>{currentUser}</span>
             <small>{savedDecks.length}件</small>
+          </div>
+          <div className="upload-panel">
+            <label className={isImporting ? "upload-drop disabled" : "upload-drop"}>
+              <input
+                type="file"
+                accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                disabled={isImporting}
+                onChange={(event) => {
+                  void importExistingDeck(event.target.files?.[0] ?? null);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <UploadCloud size={18} />
+              <span>{isImporting ? "取り込み中..." : "PDF/PPTXをアップロード"}</span>
+            </label>
+            {isImporting || importMessage ? (
+              <div className="import-progress" aria-live="polite">
+                <div>
+                  <span style={{ width: `${importProgress}%` }} />
+                </div>
+                <small>{importMessage || `${importProgress}%`}</small>
+              </div>
+            ) : (
+              <p className="muted-text">PDFは1ページ1画像として保存され、公開ビューアーと分析にそのまま使えます。</p>
+            )}
           </div>
           <div className="saved-deck-list">
             {isLoadingDecks ? <p className="muted-text">読み込み中...</p> : null}
@@ -1053,6 +1128,136 @@ async function fetchPublicShares() {
   } catch {
     return [];
   }
+}
+
+async function importPdfDeck(
+  file: File,
+  callbacks: { onProgress: (progress: number, message: string) => void }
+): Promise<Deck> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
+
+  const pdfData = new Uint8Array(await file.arrayBuffer());
+  const loadingTask = pdfjs.getDocument({ data: pdfData });
+  const pdf = await loadingTask.promise;
+  const pageCount = pdf.numPages;
+  if (pageCount < 1) throw new Error("PDFにページが見つかりませんでした");
+
+  callbacks.onProgress(4, `${pageCount}ページのPDFを解析しています...`);
+  const firstPage = await pdf.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale: 1 });
+  const aspectRatio = nearestAspectRatio(firstViewport.width / firstViewport.height);
+  const startResponse = await fetch("/api/decks/import/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: removeFileExtension(file.name),
+      sourceFileName: file.name,
+      sourceMimeType: file.type || "application/pdf",
+      slideCount: pageCount,
+      aspectRatio
+    })
+  });
+  if (!startResponse.ok) throw new Error(await readErrorMessage(startResponse, "資料取り込みの開始に失敗しました"));
+  const startData = (await startResponse.json()) as { deck: Deck };
+  const importedSlides: Slide[] = [];
+
+  for (let pageNo = 1; pageNo <= pageCount; pageNo += 1) {
+    callbacks.onProgress(Math.round(((pageNo - 1) / pageCount) * 88) + 6, `${pageNo}/${pageCount}ページを画像化しています...`);
+    const page = pageNo === 1 ? firstPage : await pdf.getPage(pageNo);
+    const image = await renderPdfPageToImage(page);
+    const slide = await uploadImportedSlide(startData.deck.id, pageNo, `Slide ${pageNo}`, image);
+    importedSlides.push(slide);
+    callbacks.onProgress(Math.round((pageNo / pageCount) * 88) + 6, `${pageNo}/${pageCount}ページを保存しました`);
+  }
+
+  callbacks.onProgress(96, "マイフォルダに反映しています...");
+  const finishResponse = await fetch("/api/decks/import/finish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deckId: startData.deck.id })
+  });
+  const finishData = finishResponse.ok ? ((await finishResponse.json()) as { deck: Deck | null }) : { deck: null };
+  const now = new Date().toISOString();
+
+  return finishData.deck ?? {
+    ...startData.deck,
+    status: "completed",
+    slideCount: importedSlides.length,
+    slides: importedSlides,
+    updatedAt: now
+  };
+}
+
+async function renderPdfPageToImage(page: PDFPageProxy) {
+  const baseViewport = page.getViewport({ scale: 1 });
+  const scale = Math.min(3, Math.max(1, 1920 / baseViewport.width));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("PDFページの画像化に失敗しました");
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvas, canvasContext: context, viewport }).promise;
+
+  const blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+  canvas.width = 1;
+  canvas.height = 1;
+  return blob;
+}
+
+async function uploadImportedSlide(deckId: string, pageNo: number, title: string, image: Blob) {
+  const formData = new FormData();
+  formData.append("deckId", deckId);
+  formData.append("pageNo", String(pageNo));
+  formData.append("title", title);
+  formData.append("image", image, `slide-${String(pageNo).padStart(3, "0")}.jpg`);
+
+  const response = await fetch("/api/decks/import/slide", {
+    method: "POST",
+    body: formData
+  });
+  if (!response.ok) throw new Error(await readErrorMessage(response, `${pageNo}ページ目の保存に失敗しました`));
+  const data = (await response.json()) as { slide: Slide };
+  return data.slide;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("スライド画像の作成に失敗しました"));
+    }, type, quality);
+  });
+}
+
+function nearestAspectRatio(ratio: number): AspectRatio {
+  const candidates: Array<{ value: AspectRatio; ratio: number }> = [
+    { value: "16:9", ratio: 16 / 9 },
+    { value: "4:3", ratio: 4 / 3 },
+    { value: "1:1", ratio: 1 }
+  ];
+  return candidates.reduce((best, candidate) =>
+    Math.abs(candidate.ratio - ratio) < Math.abs(best.ratio - ratio) ? candidate : best
+  ).value;
+}
+
+function isPdfFile(file: File) {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function isPptxFile(file: File) {
+  return (
+    file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    file.name.toLowerCase().endsWith(".pptx")
+  );
+}
+
+function removeFileExtension(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "");
 }
 
 async function fetchBundledDecks(user: string) {
