@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertDeckBelongsToUser, createImportedSlide, persistImportedSlide, uploadImportedSlideImage } from "@/lib/imported-decks";
+import { createImportedSlide, persistImportedSlide, uploadImportedSlideImage } from "@/lib/imported-decks";
 import { getRequestUser } from "@/lib/request-user";
 
 export const runtime = "nodejs";
@@ -23,8 +23,6 @@ export async function POST(request: Request) {
     if (!["image/jpeg", "image/png", "image/webp"].includes(image.type)) {
       return NextResponse.json({ error: "Slide image must be JPEG, PNG, or WebP" }, { status: 400 });
     }
-
-    await assertDeckBelongsToUser(deckId, user);
 
     const buffer = Buffer.from(await image.arrayBuffer());
     const imageUrl = await uploadImportedSlideImage({

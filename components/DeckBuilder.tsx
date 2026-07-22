@@ -1166,6 +1166,7 @@ async function importPdfDeck(
     callbacks.onProgress(Math.round(((pageNo - 1) / pageCount) * 88) + 6, `${pageNo}/${pageCount}ページを画像化しています...`);
     const page = pageNo === 1 ? firstPage : await pdf.getPage(pageNo);
     const image = await renderPdfPageToImage(page);
+    callbacks.onProgress(Math.round(((pageNo - 0.5) / pageCount) * 88) + 6, `${pageNo}/${pageCount}ページを保存しています...`);
     const slide = await uploadImportedSlide(startData.deck.id, pageNo, `Slide ${pageNo}`, image);
     importedSlides.push(slide);
     callbacks.onProgress(Math.round((pageNo / pageCount) * 88) + 6, `${pageNo}/${pageCount}ページを保存しました`);
@@ -1191,7 +1192,7 @@ async function importPdfDeck(
 
 async function renderPdfPageToImage(page: PDFPageProxy) {
   const baseViewport = page.getViewport({ scale: 1 });
-  const scale = Math.min(3, Math.max(1, 1920 / baseViewport.width));
+  const scale = Math.min(2, Math.max(1, 1440 / baseViewport.width));
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(viewport.width);
@@ -1203,7 +1204,7 @@ async function renderPdfPageToImage(page: PDFPageProxy) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvas, canvasContext: context, viewport }).promise;
 
-  const blob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+  const blob = await canvasToBlob(canvas, "image/jpeg", 0.86);
   canvas.width = 1;
   canvas.height = 1;
   return blob;
@@ -1216,13 +1217,48 @@ async function uploadImportedSlide(deckId: string, pageNo: number, title: string
   formData.append("title", title);
   formData.append("image", image, `slide-${String(pageNo).padStart(3, "0")}.jpg`);
 
-  const response = await fetch("/api/decks/import/slide", {
+  const response = await fetchWithRetry("/api/decks/import/slide", {
     method: "POST",
     body: formData
   });
   if (!response.ok) throw new Error(await readErrorMessage(response, `${pageNo}ページ目の保存に失敗しました`));
   const data = (await response.json()) as { slide: Slide };
   return data.slide;
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, retries = 2) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(input, init, 60000);
+      if (response.ok || response.status < 500 || attempt === retries) return response;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === retries) break;
+    }
+    await wait(900 * (attempt + 1));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("アップロード通信に失敗しました");
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
