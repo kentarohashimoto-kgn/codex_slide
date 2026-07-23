@@ -1079,15 +1079,18 @@ button:disabled {
 
 .public-viewer-header {
   min-height: 58px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(260px, 1.2fr) auto;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
 }
 
+.public-title-block {
+  min-width: 0;
+}
+
 .public-viewer-header h1 {
-  max-width: 980px;
   margin: 4px 0 0;
   color: var(--ink);
   font-size: 24px;
@@ -1095,7 +1098,7 @@ button:disabled {
   letter-spacing: 0;
 }
 
-.public-viewer-header span {
+.public-page-count {
   flex: 0 0 auto;
   color: var(--ink-soft);
   font-weight: 900;
@@ -1217,6 +1220,39 @@ button:disabled {
   border-radius: 8px;
 }
 
+.public-ad-slot.header-slot {
+  min-height: 54px;
+  margin-top: 0;
+  padding: 10px 16px;
+  align-self: stretch;
+  background: rgba(251, 248, 241, 0.7);
+  border-color: rgba(47, 179, 160, 0.24);
+  box-shadow: 0 10px 24px rgba(32, 38, 40, 0.07);
+}
+
+.public-ad-slot.header-slot strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-ad-slot.header-slot.emphasis {
+  color: #fffaf2;
+  background: #243131;
+  border-color: rgba(245, 154, 42, 0.5);
+  box-shadow: 0 14px 30px rgba(32, 38, 40, 0.22);
+}
+
+.public-ad-slot.header-slot.emphasis strong {
+  color: #fffaf2;
+  font-size: 15px;
+  font-weight: 900;
+}
+
 .public-ad-slot.linked {
   cursor: pointer;
 }
@@ -1226,6 +1262,10 @@ button:disabled {
   max-height: 150px;
   display: block;
   object-fit: contain;
+}
+
+.public-ad-slot.header-slot img {
+  max-height: 42px;
 }
 
 .public-empty {
@@ -1274,6 +1314,10 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .public-viewer-header {
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  }
+
   .thumb-rail ol {
     height: auto;
     max-height: 220px;
@@ -1311,11 +1355,15 @@ button:disabled {
   }
 
   .public-viewer-header {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .public-viewer-header h1 {
     font-size: 20px;
+  }
+
+  .public-ad-slot.header-slot {
+    min-height: 48px;
   }
 
   .public-slide-nav {

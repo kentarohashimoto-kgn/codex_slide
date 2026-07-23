@@ -105,11 +105,12 @@ export function PublicShareViewer({ token }: { token: string }) {
   return (
     <main className="public-viewer-shell">
       <header className="public-viewer-header">
-        <div>
+        <div className="public-title-block">
           <p className="eyebrow">SHARED DECK</p>
           <h1>{share.title}</h1>
         </div>
-        <span>
+        <ShareAd token={token} adConfig={share.adConfig} pageNo={slide.pageNo} viewerId={viewerId} viewerLabel={viewerLabel} placement="header" />
+        <span className="public-page-count">
           {String(slide.pageNo).padStart(2, "0")} / {String(share.deck.slides.length).padStart(2, "0")}
         </span>
       </header>
@@ -149,7 +150,6 @@ export function PublicShareViewer({ token }: { token: string }) {
               <ChevronRight size={18} />
             </button>
           </nav>
-          <ShareAd token={token} adConfig={share.adConfig} pageNo={slide.pageNo} viewerId={viewerId} viewerLabel={viewerLabel} />
         </div>
       </section>
     </main>
@@ -187,13 +187,15 @@ function ShareAd({
   adConfig,
   pageNo,
   viewerId,
-  viewerLabel
+  viewerLabel,
+  placement = "body"
 }: {
   token: string;
   adConfig: ShareAdConfig;
   pageNo: number;
   viewerId: string;
   viewerLabel?: string;
+  placement?: "header" | "body";
 }) {
   if (adConfig.kind === "none") return null;
 
@@ -215,12 +217,17 @@ function ShareAd({
       <strong>{adConfig.text || "お知らせ"}</strong>
     );
 
+  const isTextEmphasis = adConfig.kind === "text" && pageNo % 3 === 0;
+  const className = ["public-ad-slot", placement === "header" ? "header-slot" : "", isTextEmphasis ? "emphasis" : ""]
+    .filter(Boolean)
+    .join(" ");
+
   if (!adConfig.linkUrl) {
-    return <aside className="public-ad-slot">{content}</aside>;
+    return <aside className={className}>{content}</aside>;
   }
 
   return (
-    <a className="public-ad-slot linked" href={adConfig.linkUrl} target="_blank" rel="noreferrer" onClick={() => void logClick()}>
+    <a className={`${className} linked`} href={adConfig.linkUrl} target="_blank" rel="noreferrer" onClick={() => void logClick()}>
       {content}
       <ExternalLink size={16} />
     </a>
